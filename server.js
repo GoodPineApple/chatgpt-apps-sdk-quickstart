@@ -93,6 +93,7 @@ function createTodoServer() {
   return server;
 }
 
+// Google App Engine과 Cloud Run은 PORT 환경 변수를 자동으로 설정합니다
 const port = Number(process.env.PORT ?? 8787);
 const MCP_PATH = "/mcp";
 

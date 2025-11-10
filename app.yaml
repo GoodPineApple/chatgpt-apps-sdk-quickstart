@@ -1,0 +1,12 @@
+env: standard
+runtime: nodejs20
+
+env_variables:
+  TZ: "Asia/Seoul"
+  PORT: "8080"
+
+handlers:
+  - url: /.*
+    secure: always
+    script: auto
+

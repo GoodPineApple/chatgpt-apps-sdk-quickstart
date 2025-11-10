@@ -35,22 +35,53 @@ npm start
 npx @modelcontextprotocol/inspector@latest http://localhost:8787/mcp
 ```
 
-### 4. ngrok으로 터널링 (ChatGPT 연결용)
+### 4. 배포 방법 선택
+
+#### 옵션 1: Google Cloud 배포 (권장)
+
+Google App Engine 또는 Cloud Run에 배포하여 안정적인 공개 URL을 얻을 수 있습니다.
+
+```bash
+# App Engine 배포
+gcloud app deploy
+
+# 또는 Cloud Run 배포
+gcloud run deploy chatgpt-apps-sdk --source . --platform managed --region asia-northeast3 --allow-unauthenticated --port 8080
+```
+
+> **상세한 배포 가이드**: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)를 참고하세요.
+
+#### 옵션 2: ngrok 사용 (로컬 개발용)
+
+로컬 개발 환경에서 빠르게 테스트하려면 ngrok을 사용할 수 있습니다.
 
 ```bash
 ngrok http 8787
 ```
 
-ngrok이 제공하는 공개 URL을 사용하여 ChatGPT에 연결할 수 있습니다.
+> **상세한 설정 방법**: [SETUP_GUIDE.md](./SETUP_GUIDE.md)를 참고하세요.
 
 ## ChatGPT에 연결하기
 
-1. ChatGPT에서 **Settings → Apps & Connectors → Advanced settings**로 이동하여 개발자 모드 활성화
-2. **Settings → Connectors**에서 **Create** 버튼 클릭
-3. ngrok URL + `/mcp` 경로 입력 (예: `https://<subdomain>.ngrok.app/mcp`)
-4. 이름과 설명을 입력하고 **Create** 클릭
-5. 새 채팅을 열고 **More** 메뉴에서 커넥터 추가
-6. "Show my tasks" 같은 프롬프트로 테스트
+### 배포된 URL 사용 (Google Cloud)
+
+1. 배포 완료 후 생성된 URL 확인:
+   - App Engine: `https://YOUR_PROJECT_ID.an.r.appspot.com/mcp`
+   - Cloud Run: `https://chatgpt-apps-sdk-XXXXX-xx.a.run.app/mcp`
+
+2. ChatGPT 설정:
+   - **Settings → Apps & Connectors → Advanced settings**에서 개발자 모드 활성화
+   - **Settings → Connectors**에서 **Create** 버튼 클릭
+   - 배포된 URL 입력 (예: `https://YOUR_PROJECT_ID.an.r.appspot.com/mcp`)
+   - 이름과 설명 입력 후 **Create** 클릭
+
+3. 테스트:
+   - 새 채팅을 열고 **More** 메뉴에서 커넥터 추가
+   - "Show my tasks" 같은 프롬프트로 테스트
+
+### ngrok 사용 (로컬 개발)
+
+자세한 단계별 가이드는 [SETUP_GUIDE.md](./SETUP_GUIDE.md)를 참고하세요.
 
 ## 주요 개념
 
