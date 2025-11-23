@@ -227,21 +227,16 @@ https://chatgpt-apps-sdk-XXXXX-xx.a.run.app/mcp
 
 ### 3단계: ChatGPT 커넥터 설정
 
-1. **ChatGPT 웹사이트 접속**
-   - [https://chat.openai.com](https://chat.openai.com) 로그인
+> **⚠️ 중요**: ChatGPT 커넥터 추가는 UI가 자주 변경되므로, 상세한 가이드는 [CHATGPT_SETUP.md](./CHATGPT_SETUP.md)를 참고하세요.
 
-2. **설정 → Connectors로 이동**
-   - 개발자 모드가 활성화되어 있어야 합니다
+**간단 요약:**
+1. **ChatGPT 웹사이트 접속**: [https://chat.openai.com](https://chat.openai.com)
+2. **설정 → Beta features 또는 Apps & Connectors**: 개발자 모드 활성화
+3. **Connectors 섹션**: 새 커넥터 생성
+4. **URL 입력**: `https://YOUR_DEPLOYED_URL/mcp` (반드시 `/mcp` 포함)
+5. **테스트**: 새 채팅에서 커넥터 선택 후 테스트
 
-3. **새 커넥터 생성 또는 기존 커넥터 수정**
-   - **URL 필드에 배포된 URL 입력:**
-     ```
-     https://YOUR_DEPLOYED_URL/mcp
-     ```
-   - **중요**: 반드시 `/mcp` 경로를 포함해야 합니다
-
-4. **저장 및 테스트**
-   - 커넥터를 저장한 후 새 채팅에서 테스트
+**자세한 단계별 가이드**: [CHATGPT_SETUP.md](./CHATGPT_SETUP.md) 참고
 
 ---
 

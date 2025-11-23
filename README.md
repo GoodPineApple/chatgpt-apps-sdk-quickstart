@@ -63,25 +63,28 @@ ngrok http 8787
 
 ## ChatGPT에 연결하기
 
-### 배포된 URL 사용 (Google Cloud)
+> **⚠️ 중요**: ChatGPT UI는 자주 변경되므로, 상세한 단계별 가이드는 **[CHATGPT_SETUP.md](./CHATGPT_SETUP.md)**를 반드시 참고하세요.
 
-1. 배포 완료 후 생성된 URL 확인:
+### 빠른 요약
+
+1. **배포된 URL 확인**:
    - App Engine: `https://YOUR_PROJECT_ID.an.r.appspot.com/mcp`
    - Cloud Run: `https://chatgpt-apps-sdk-XXXXX-xx.a.run.app/mcp`
 
-2. ChatGPT 설정:
-   - **Settings → Apps & Connectors → Advanced settings**에서 개발자 모드 활성화
-   - **Settings → Connectors**에서 **Create** 버튼 클릭
-   - 배포된 URL 입력 (예: `https://YOUR_PROJECT_ID.an.r.appspot.com/mcp`)
-   - 이름과 설명 입력 후 **Create** 클릭
+2. **ChatGPT 설정**:
+   - ChatGPT Plus 구독 필요할 수 있음
+   - Settings → Beta features 또는 Apps & Connectors에서 개발자 모드 활성화
+   - Connectors에서 새 커넥터 생성
+   - 배포된 URL + `/mcp` 입력
 
-3. 테스트:
-   - 새 채팅을 열고 **More** 메뉴에서 커넥터 추가
-   - "Show my tasks" 같은 프롬프트로 테스트
+3. **테스트**:
+   - 새 채팅에서 커넥터 선택
+   - "Show my tasks" 프롬프트로 테스트
 
-### ngrok 사용 (로컬 개발)
+### 상세 가이드
 
-자세한 단계별 가이드는 [SETUP_GUIDE.md](./SETUP_GUIDE.md)를 참고하세요.
+- **ChatGPT 커넥터 설정**: [CHATGPT_SETUP.md](./CHATGPT_SETUP.md) - 개발자 모드 활성화부터 커넥터 추가까지 상세 설명
+- **ngrok 사용 (로컬 개발)**: [SETUP_GUIDE.md](./SETUP_GUIDE.md) - 로컬 개발 환경 설정
 
 ## 주요 개념
 
