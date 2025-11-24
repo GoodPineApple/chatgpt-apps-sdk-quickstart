@@ -1,6 +1,32 @@
 # ChatGPT Apps SDK Quickstart - Todo App
 
-이 프로젝트는 OpenAI의 ChatGPT Apps SDK 퀵스타트 가이드를 따라 만든 Todo 앱입니다.
+이 프로젝트는 OpenAI의 ChatGPT Apps SDK 퀵스타트 가이드를 따라 만든 Todo 앱입니다. **공식 문서의 예제 코드를 그대로 사용하면 ChatGPT 커넥터 등록이 실패하는 문제를 해결**하여 실제로 작동하는 구현을 제공합니다.
+
+## 📝 프로젝트 소개 (GitHub 공유용)
+
+ChatGPT Apps SDK는 ChatGPT 내에서 동작하는 커스텀 앱을 만들 수 있게 해주는 도구입니다. 공식 문서의 예제 코드를 그대로 사용하면 커넥터 등록이 실패하는데, 이는 HEAD 요청 미처리, Accept 헤더 무시, 요청 본문 스트림 처리 문제 때문입니다. 본 프로젝트는 이러한 문제를 해결하여 Google Cloud Run에 배포하고, ChatGPT Plus 구독 후 개발자 모드를 활성화하여 앱을 추가하면 바로 사용할 수 있도록 구현했습니다.
+
+## 🎯 주요 개선사항
+
+공식 문서의 예제 코드를 그대로 사용하면 ChatGPT 커넥터 등록이 실패합니다. 다음 수정사항을 적용하여 성공적으로 작동하도록 했습니다:
+
+### 1. HEAD 요청 처리 추가
+ChatGPT가 연결 테스트를 위해 HEAD 요청을 보내는데, 이를 처리하지 않으면 404 오류가 발생합니다.
+- Health check에서 HEAD 요청 처리
+- MCP 엔드포인트에서도 HEAD 요청 지원
+
+### 2. Accept 헤더 기반 응답 형식 결정
+ChatGPT는 POST 요청에는 JSON을, GET 요청에는 SSE(Server-Sent Events)를 기대합니다.
+- `accept: application/json` → JSON 응답
+- `accept: text/event-stream` → SSE 스트리밍 응답
+- `enableJsonResponse` 옵션을 동적으로 설정
+
+### 3. 요청 본문 스트림 처리 개선
+Node.js HTTP 스트림은 한 번만 읽을 수 있으므로, 요청 본문을 미리 읽으면 transport가 읽지 못합니다.
+- 요청 본문을 미리 읽지 않고 transport가 직접 읽도록 수정
+
+### 4. 상세한 로깅 추가
+디버깅을 위해 요청 ID, User-Agent, 헤더, 응답 시간 등을 상세히 로깅합니다.
 
 ## 프로젝트 구조
 
@@ -10,10 +36,12 @@ chatgpt-apps-sdk-quickstart/
 │   └── todo-widget.html    # ChatGPT에 표시될 웹 컴포넌트
 ├── server.js               # MCP 서버 (Model Context Protocol)
 ├── package.json
+├── app.yaml                # Google App Engine 배포 설정
+├── Dockerfile              # Cloud Run 배포용
 └── README.md
 ```
 
-## 설치 및 실행
+## 빠른 시작
 
 ### 1. 의존성 설치
 
@@ -21,7 +49,7 @@ chatgpt-apps-sdk-quickstart/
 npm install
 ```
 
-### 2. 서버 실행
+### 2. 로컬 실행
 
 ```bash
 npm start
@@ -29,85 +57,128 @@ npm start
 
 서버가 `http://localhost:8787/mcp`에서 실행됩니다.
 
-### 3. MCP Inspector로 테스트 (선택사항)
+### 3. 배포 (Google Cloud Run 권장)
 
 ```bash
-npx @modelcontextprotocol/inspector@latest http://localhost:8787/mcp
+# Google Cloud SDK 설치 및 인증
+gcloud auth login
+gcloud config set project YOUR_PROJECT_ID
+
+# Cloud Run에 배포
+gcloud run deploy chatgpt-apps-sdk \
+  --source . \
+  --platform managed \
+  --region asia-northeast3 \
+  --allow-unauthenticated \
+  --port 8080
 ```
 
-### 4. 배포 방법 선택
+배포 후 생성된 URL: `https://YOUR_SERVICE-XXXXX-xx.a.run.app/mcp`
 
-#### 옵션 1: Google Cloud 배포 (권장)
+### 4. ChatGPT에 연결
 
-Google App Engine 또는 Cloud Run에 배포하여 안정적인 공개 URL을 얻을 수 있습니다.
+1. **ChatGPT Plus 구독** 필요
+2. **개발자 모드 활성화**:
+   - Settings → Beta features 또는 Apps & Connectors
+   - Developer mode 토글 ON
+3. **커넥터 생성**:
+   - Settings → Connectors → Create
+   - URL 입력: `https://YOUR_SERVICE-XXXXX-xx.a.run.app/mcp`
+   - 인증: "인증없음" 선택
+4. **테스트**:
+   - 새 채팅 시작
+   - 커넥터 선택
+   - "Show my tasks" 입력
 
-```bash
-# App Engine 배포
-gcloud app deploy
+## 핵심 개념
 
-# 또는 Cloud Run 배포
-gcloud run deploy chatgpt-apps-sdk --source . --platform managed --region asia-northeast3 --allow-unauthenticated --port 8080
-```
-
-> **상세한 배포 가이드**: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)를 참고하세요.
-
-#### 옵션 2: ngrok 사용 (로컬 개발용)
-
-로컬 개발 환경에서 빠르게 테스트하려면 ngrok을 사용할 수 있습니다.
-
-```bash
-ngrok http 8787
-```
-
-> **상세한 설정 방법**: [SETUP_GUIDE.md](./SETUP_GUIDE.md)를 참고하세요.
-
-## ChatGPT에 연결하기
-
-> **⚠️ 중요**: ChatGPT UI는 자주 변경되므로, 상세한 단계별 가이드는 **[CHATGPT_SETUP.md](./CHATGPT_SETUP.md)**를 반드시 참고하세요.
-
-### 빠른 요약
-
-1. **배포된 URL 확인**:
-   - App Engine: `https://YOUR_PROJECT_ID.an.r.appspot.com/mcp`
-   - Cloud Run: `https://chatgpt-apps-sdk-XXXXX-xx.a.run.app/mcp`
-
-2. **ChatGPT 설정**:
-   - ChatGPT Plus 구독 필요할 수 있음
-   - Settings → Beta features 또는 Apps & Connectors에서 개발자 모드 활성화
-   - Connectors에서 새 커넥터 생성
-   - 배포된 URL + `/mcp` 입력
-
-3. **테스트**:
-   - 새 채팅에서 커넥터 선택
-   - "Show my tasks" 프롬프트로 테스트
-
-### 상세 가이드
-
-- **ChatGPT 커넥터 설정**: [CHATGPT_SETUP.md](./CHATGPT_SETUP.md) - 개발자 모드 활성화부터 커넥터 추가까지 상세 설명
-- **ngrok 사용 (로컬 개발)**: [SETUP_GUIDE.md](./SETUP_GUIDE.md) - 로컬 개발 환경 설정
-
-## 주요 개념
-
-### 1. MCP 서버 (Model Context Protocol)
+### MCP 서버 (Model Context Protocol)
 - ChatGPT와 앱 간 통신을 담당하는 서버
-- Tools를 등록하여 ChatGPT가 호출할 수 있는 기능을 정의
-- Resources를 등록하여 UI 컴포넌트를 제공
+- **Tools**: ChatGPT가 호출할 수 있는 기능 정의 (`add_todo`, `complete_todo`)
+- **Resources**: ChatGPT에 제공할 UI 컴포넌트 정의 (`todo-widget.html`)
 
-### 2. 웹 컴포넌트
+### 웹 컴포넌트
 - ChatGPT 인터페이스 내 iframe으로 렌더링되는 HTML
-- `window.openai` API를 통해 ChatGPT와 상호작용
 - `window.openai.callTool()`: 도구 호출
 - `window.openai.toolOutput`: 도구 실행 결과 접근
 
-### 3. Tools
-- `add_todo`: 새로운 할 일 추가
-- `complete_todo`: 할 일 완료 처리
+### 동작 흐름
 
-## 동작 방식
+```
+사용자: "할 일 추가해줘"
+  ↓
+ChatGPT: POST /mcp → add_todo 도구 호출
+  ↓
+서버: 할 일 추가 → structuredContent 반환
+  ↓
+ChatGPT: todo-widget.html 렌더링
+  ↓
+위젯: window.openai.toolOutput에서 데이터 읽어서 표시
+```
 
-1. 사용자가 ChatGPT에서 "할 일 추가" 요청
-2. ChatGPT가 MCP 서버의 `add_todo` 도구 호출
-3. MCP 서버가 도구 실행 후 결과 반환 (structuredContent 포함)
-4. ChatGPT가 웹 컴포넌트를 렌더링하고 데이터 전달
-5. 웹 컴포넌트가 `window.openai.toolOutput`에서 데이터를 읽어 UI 업데이트
+## 주요 코드 구조
 
+### MCP 서버 설정
+
+```javascript
+// Tools 등록
+server.registerTool("add_todo", {
+  title: "Add todo",
+  description: "Creates a todo item with the given title.",
+  inputSchema: { title: z.string().min(1) },
+  _meta: {
+    "openai/outputTemplate": "ui://widget/todo.html",
+  },
+}, async (args) => {
+  // 도구 실행 로직
+  return {
+    content: [{ type: "text", text: "Added todo" }],
+    structuredContent: { tasks: todos },
+  };
+});
+
+// Resources 등록
+server.registerResource("todo-widget", "ui://widget/todo.html", {}, async () => ({
+  contents: [{
+    uri: "ui://widget/todo.html",
+    mimeType: "text/html+skybridge",
+    text: todoHtml,
+  }],
+}));
+```
+
+### HTTP 서버 설정
+
+```javascript
+// Accept 헤더에 따라 응답 형식 결정
+const wantsSSE = acceptHeader.includes("text/event-stream");
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: undefined, // stateless mode
+  enableJsonResponse: !wantsSSE, // SSE를 원하면 false
+});
+```
+
+## 문제 해결
+
+### 커넥터 등록 실패
+- **HEAD 요청 처리 확인**: 서버가 HEAD 요청을 200으로 응답하는지 확인
+- **URL 형식 확인**: 반드시 `/mcp` 경로 포함, HTTPS 필수
+- **서버 로그 확인**: Cloud Run 로그에서 ChatGPT 요청이 도착하는지 확인
+
+### 400 오류
+- **요청 본문 스트림**: 요청 본문을 미리 읽지 않도록 확인
+- **Content-Type 헤더**: Accept 헤더에 맞는 Content-Type 설정
+
+### SSE 스트리밍 문제
+- **Accept 헤더 확인**: `text/event-stream`을 요청하는지 확인
+- **enableJsonResponse**: SSE를 원할 때는 `false`로 설정
+
+## 참고 자료
+
+- [OpenAI Apps SDK 공식 문서](https://developers.openai.com/apps-sdk)
+- [MCP 프로토콜 문서](https://platform.openai.com/docs/mcp)
+- [EZDegree 통합 가이드](./EZDEGREE_INTEGRATION.md) - EZDegree 서비스 연동 방법
+
+## 라이선스
+
+MIT
