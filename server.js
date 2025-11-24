@@ -122,14 +122,6 @@ const httpServer = createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
-  
-  // 요청 본문 수집 (POST 요청용)
-  let requestBody = "";
-  if (req.method === "POST" || req.method === "PUT") {
-    req.on("data", (chunk) => {
-      requestBody += chunk.toString();
-    });
-  }
 
   // CORS preflight 처리
   if (req.method === "OPTIONS") {
@@ -146,14 +138,19 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
-  // Health check (GET /)
-  if (req.method === "GET" && url.pathname === "/") {
+  // Health check (GET /, HEAD /)
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/") {
     logRequest();
-    console.log(`[${requestId}] Health check request`);
+    console.log(`[${requestId}] Health check request (${req.method})`);
     res.writeHead(200, { 
       "content-type": "text/plain",
       "Access-Control-Allow-Origin": "*",
-    }).end("Todo MCP server");
+    });
+    if (req.method === "GET") {
+      res.end("Todo MCP server");
+    } else {
+      res.end(); // HEAD 요청은 본문 없이 헤더만
+    }
     const latency = Date.now() - startTime;
     console.log(`[${requestId}] ✅ Health check completed (${latency}ms)`);
     return;
@@ -161,38 +158,43 @@ const httpServer = createServer(async (req, res) => {
 
   // MCP 엔드포인트 처리 (루트 경로와 /mcp 경로 모두 처리)
   const isMcpEndpoint = url.pathname === MCP_PATH || 
-                       (url.pathname === "/" && req.method === "POST");
-  const MCP_METHODS = new Set(["POST", "GET", "DELETE"]);
+                       (url.pathname === "/" && (req.method === "POST" || req.method === "HEAD"));
+  const MCP_METHODS = new Set(["POST", "GET", "DELETE", "HEAD"]);
   
   if (isMcpEndpoint && req.method && MCP_METHODS.has(req.method)) {
     logRequest();
-    
-    // POST 요청의 경우 본문을 기다림
-    if (req.method === "POST") {
-      await new Promise((resolve) => {
-        req.on("end", resolve);
-      });
-      if (requestBody) {
-        console.log(`[${requestId}] Request body:`, requestBody);
-        try {
-          const parsed = JSON.parse(requestBody);
-          console.log(`[${requestId}] Parsed JSON:`, JSON.stringify(parsed, null, 2));
-        } catch (e) {
-          console.log(`[${requestId}] Body is not JSON`);
-        }
-      }
-    }
-    
     console.log(`[${requestId}] Processing MCP request`);
+    
+    // Accept 헤더 확인하여 응답 형식 결정
+    const acceptHeader = req.headers["accept"] || "";
+    const wantsSSE = acceptHeader.includes("text/event-stream");
+    const wantsJSON = acceptHeader.includes("application/json") || !wantsSSE;
+    
+    console.log(`[${requestId}] Accept header: ${acceptHeader}`);
+    console.log(`[${requestId}] Wants SSE: ${wantsSSE}, Wants JSON: ${wantsJSON}`);
+    
     // CORS 헤더 설정
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
-    res.setHeader("Content-Type", "application/json");
+    
+    // Content-Type은 transport가 설정하도록 하거나, SSE인 경우 명시적으로 설정
+    if (wantsSSE) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+    } else {
+      res.setHeader("Content-Type", "application/json");
+    }
 
+    // StreamableHTTPServerTransport 생성
+    // stateless 모드에서는 매 요청마다 새 transport를 생성해야 함
+    // enableJsonResponse는 SSE를 원할 때는 false로 설정
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless mode
-      enableJsonResponse: true,
+      enableJsonResponse: wantsJSON, // SSE를 원하면 false
     });
+    
+    console.log(`[${requestId}] Transport created with enableJsonResponse: ${wantsJSON}`);
 
     // 연결 종료 시 정리
     res.on("close", () => {
@@ -214,12 +216,43 @@ const httpServer = createServer(async (req, res) => {
     };
 
     try {
-      // 매 요청마다 transport에 연결 (stateless 모드)
+      // HEAD 요청은 간단히 응답만 보내고 종료
+      if (req.method === "HEAD") {
+        console.log(`[${requestId}] HEAD request - sending headers only`);
+        res.writeHead(200, {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Expose-Headers": "Mcp-Session-Id",
+          "Content-Type": "application/json",
+        });
+        res.end();
+        console.log(`[${requestId}] ✅ HEAD request completed`);
+        return;
+      }
+
+      // MCP 서버를 transport에 연결
+      // stateless 모드에서는 매 요청마다 connect해야 하지만, 서버 인스턴스는 재사용
       console.log(`[${requestId}] Connecting MCP server to transport...`);
       await mcpServer.connect(transport);
       console.log(`[${requestId}] MCP server connected, handling request...`);
-      await transport.handleRequest(req, res);
-      console.log(`[${requestId}] Request handled successfully`);
+      
+      // transport.handleRequest가 req 스트림을 직접 읽도록 함
+      // 요청 본문은 transport가 처리하므로 여기서 읽지 않음
+      // 중요: req 스트림은 한 번만 읽을 수 있으므로, 미리 읽으면 안 됨
+      console.log(`[${requestId}] Calling transport.handleRequest...`);
+      console.log(`[${requestId}] Request readable: ${req.readable}, destroyed: ${req.destroyed}`);
+      
+      try {
+        await transport.handleRequest(req, res);
+        console.log(`[${requestId}] Request handled successfully`);
+      } catch (handleError) {
+        console.error(`[${requestId}] Error in transport.handleRequest:`, handleError);
+        console.error(`[${requestId}] Error details:`, {
+          message: handleError.message,
+          stack: handleError.stack,
+          name: handleError.name,
+        });
+        throw handleError; // 상위 catch로 전달
+      }
     } catch (error) {
       const latency = Date.now() - startTime;
       console.error(`[${requestId}] ❌ Error handling MCP request (${latency}ms):`, error);
@@ -227,9 +260,6 @@ const httpServer = createServer(async (req, res) => {
       console.error(`[${requestId}] Request URL:`, req.url);
       console.error(`[${requestId}] Request Method:`, req.method);
       console.error(`[${requestId}] Request Headers:`, JSON.stringify(req.headers, null, 2));
-      if (requestBody) {
-        console.error(`[${requestId}] Request Body:`, requestBody);
-      }
       
       if (!res.headersSent) {
         res.writeHead(500, {
